@@ -244,15 +244,38 @@ fn light_icon(is_on: bool, hue: f64, saturation: f64) -> Icon {
 
         let color = hsv_to_rgb(hue, saturation);
         let mut rgba = vec![0; SIZE * SIZE * 4];
-        let left = SIZE.saturating_sub(metrics.width) / 2;
-        let top = SIZE.saturating_sub(metrics.height) / 2;
+
+        // Center the glyph
+        let (mut min_x, mut min_y) = (metrics.width, metrics.height);
+        let (mut max_x, mut max_y) = (0, 0);
+        let mut has_pixels = false;
+        for y in 0..metrics.height {
+            for x in 0..metrics.width {
+                if bitmap[y * metrics.width + x] != 0 {
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
+                    has_pixels = true;
+                }
+            }
+        }
+
+        let (left, top) = if has_pixels {
+            (
+                (SIZE as isize - (max_x - min_x + 1) as isize) / 2 - min_x as isize,
+                (SIZE as isize - (max_y - min_y + 1) as isize) / 2 - min_y as isize,
+            )
+        } else {
+            (0, 0)
+        };
 
         for y in 0..metrics.height {
             for x in 0..metrics.width {
-                let px = left + x;
-                let py = top + y;
-                if px < SIZE && py < SIZE {
-                    let offset = (py * SIZE + px) * 4;
+                let px = left + x as isize;
+                let py = top + y as isize;
+                if px >= 0 && px < SIZE as isize && py >= 0 && py < SIZE as isize {
+                    let offset = (py as usize * SIZE + px as usize) * 4;
                     rgba[offset..offset + 3].copy_from_slice(&color[..3]);
                     rgba[offset + 3] = bitmap[y * metrics.width + x];
                 }
