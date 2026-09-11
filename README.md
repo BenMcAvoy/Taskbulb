@@ -47,6 +47,14 @@ A screenshot:
    .\target\release\taskbulb.exe
    ```
 
+## Usage
+
+| Shortcut | Action |
+| --- | --- |
+| Scroll | Adjust value |
+| Ctrl+Scroll | Adjust hue |
+| Alt+Scroll | Adjust saturation |
+
 ## Windows startup
 
 To start Taskbulb automatically when the current Windows user signs in:
