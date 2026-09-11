@@ -2,7 +2,10 @@
 
 A small Rust application for controlling a smart light through a [Home Assistant](https://www.home-assistant.io/) instance from a Windows taskbar notification-area (system tray) icon
 
-Taskbulb is designed to control a room's smart light without pop-ups or web technologies, keeping the experience unobtrusive
+Taskbulb is designed to control a room's light without popups or web technologies, keeping the experience unintrusive
+
+A screenshot:
+<img width="153" height="103" alt="image" src="https://github.com/user-attachments/assets/a423db3e-750d-4a92-af4c-dadffc385e60" />
 
 ## Requirements
 
