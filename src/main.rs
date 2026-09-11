@@ -1,3 +1,5 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 use reqwest::Client;
 use tao::{
     event::Event,
