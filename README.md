@@ -43,3 +43,14 @@ Taskbulb is designed to control a room's smart light without pop-ups or web tech
    ```text
    .\target\release\taskbulb.exe
    ```
+
+## Windows startup
+
+To start Taskbulb automatically when the current Windows user signs in:
+
+1. Create an install directory, for example `%LOCALAPPDATA%\Taskbulb`.
+2. Copy `target\release\taskbulb.exe` and `.env` into that directory. The `.env` file must be beside the executable.
+3. Open the per-user Startup folder by pressing `Win+R`, entering `shell:startup`, and pressing Enter.
+4. Create a shortcut named `Taskbulb` in that folder. Set its target to the installed `taskbulb.exe` and its **Start in** / working directory to the install directory.
+
+Only the shortcut should be placed in the Startup folder; keep the executable and `.env` together in the install directory.
