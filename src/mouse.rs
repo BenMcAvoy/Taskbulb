@@ -79,7 +79,7 @@ unsafe extern "system" fn low_level_mouse_hook(
     lparam: windows_sys::Win32::Foundation::LPARAM,
 ) -> windows_sys::Win32::Foundation::LRESULT {
     use windows_sys::Win32::UI::{
-        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_MENU},
+        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_SHIFT},
         WindowsAndMessaging::{CallNextHookEx, MSLLHOOKSTRUCT, WM_MOUSEHWHEEL, WM_MOUSEWHEEL},
     };
 
@@ -104,7 +104,13 @@ unsafe extern "system" fn low_level_mouse_hook(
         if inside_tray && let Some(proxy) = HOOK_PROXY.get() {
             let ctrl = unsafe { GetAsyncKeyState(VK_CONTROL as i32) < 0 };
             let alt = unsafe { GetAsyncKeyState(VK_MENU as i32) < 0 };
-            let _ = proxy.send_event(UserEvent::GlobalWheel { delta, ctrl, alt });
+            let shift = unsafe { GetAsyncKeyState(VK_SHIFT as i32) < 0 };
+            let _ = proxy.send_event(UserEvent::GlobalWheel {
+                delta,
+                ctrl,
+                alt,
+                shift,
+            });
         }
     }
 

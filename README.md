@@ -52,6 +52,7 @@ A screenshot:
 | Shortcut | Action |
 | --- | --- |
 | Scroll | Adjust value |
+| Shift+Scroll | Adjust brightness on all DDC/CI monitors |
 | Ctrl+Scroll | Adjust hue (0-255) |
 | Alt+Scroll | Adjust saturation |
 | Middle-click | Reset hue and saturation to 0 |

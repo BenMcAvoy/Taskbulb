@@ -7,6 +7,7 @@ use tao::{
 };
 
 mod light;
+mod monitor;
 mod mouse;
 use light::LightController;
 use tray_icon::{
@@ -27,6 +28,7 @@ enum UserEvent {
         delta: i16,
         ctrl: bool,
         alt: bool,
+        shift: bool,
     },
     #[cfg(target_os = "windows")]
     Tooltip {
@@ -34,22 +36,45 @@ enum UserEvent {
         s: f64,
         v: i64,
     },
+    #[cfg(target_os = "windows")]
+    MonitorBrightness {
+        brightness: u8,
+    },
 }
 
-fn set_tooltip(tray_icon: &mut tray_icon::TrayIcon, h: f64, s: f64, v: i64) {
-    let _ = tray_icon.set_tooltip(Some(format!(
-        "H: {:.0}, S: {:.0}%, V: {:.0}%",
-        h,
-        s,
-        v as f64 * 100.0 / 255.0
-    )));
+#[derive(Clone, Copy)]
+struct TooltipState {
+    hue: f64,
+    saturation: f64,
+    light_brightness: i64,
+    monitor_brightness: Option<u8>,
+}
+
+fn tooltip_text(state: TooltipState) -> String {
+    let monitor = state
+        .monitor_brightness
+        .map(|brightness| format!("{brightness}%"))
+        .unwrap_or_else(|| "--".to_string());
+    format!(
+        "H: {:.0}, S: {:.0}%, Brightness: {:.0}%, Monitor: {}",
+        state.hue,
+        state.saturation,
+        state.light_brightness as f64 * 100.0 / 255.0,
+        monitor
+    )
+}
+
+fn set_tooltip(tray_icon: &mut tray_icon::TrayIcon, state: TooltipState) {
+    let _ = tray_icon.set_tooltip(Some(tooltip_text(state)));
 }
 
 #[tokio::main]
 async fn main() {
     let light = LightController::new(Client::new());
+    let monitors = monitor::MonitorController::new();
 
     let initial_state = light.state().await;
+    let initial_monitor_brightness = monitors.brightness().await;
     let is_light_on = initial_state.as_ref().map(|s| s.is_on).unwrap_or(false);
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
@@ -92,6 +117,8 @@ async fn main() {
     #[cfg(target_os = "windows")]
     let mut light_updates = light.subscribe();
     #[cfg(target_os = "windows")]
+    let mut monitor_updates = monitors.subscribe();
+    #[cfg(target_os = "windows")]
     {
         let proxy = click_proxy.clone();
         tokio::spawn(async move {
@@ -109,9 +136,24 @@ async fn main() {
             }
         });
     }
+    #[cfg(target_os = "windows")]
+    {
+        let proxy = click_proxy.clone();
+        tokio::spawn(async move {
+            while let Ok(brightness) = monitor_updates.recv().await {
+                let _ = proxy.send_event(UserEvent::MonitorBrightness { brightness });
+            }
+        });
+    }
 
     let _menu_channel = MenuEvent::receiver();
     let _tray_channel = TrayIconEvent::receiver();
+    let mut tooltip = TooltipState {
+        hue: initial_state.as_ref().map(|s| s.hue).unwrap_or(0.0),
+        saturation: initial_state.as_ref().map(|s| s.saturation).unwrap_or(0.0),
+        light_brightness: initial_state.as_ref().map(|s| s.brightness).unwrap_or(0),
+        monitor_brightness: initial_monitor_brightness,
+    };
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -132,15 +174,7 @@ async fn main() {
                             initial_state.as_ref().map(|s| s.hue).unwrap_or(0.0),
                             initial_state.as_ref().map(|s| s.saturation).unwrap_or(0.0),
                         ))
-                        .with_tooltip(format!(
-                            "H: {:.0}, S: {:.0}%, V: {:.0}%",
-                            initial_state.as_ref().map(|s| s.hue).unwrap_or(0.0),
-                            initial_state.as_ref().map(|s| s.saturation).unwrap_or(0.0),
-                            initial_state
-                                .as_ref()
-                                .map(|s| s.brightness as f64 * 100.0 / 255.0)
-                                .unwrap_or(0.0)
-                        ))
+                        .with_tooltip(tooltip_text(tooltip))
                         .build()
                         .unwrap(),
                 );
@@ -205,15 +239,33 @@ async fn main() {
 
             #[cfg(target_os = "windows")]
             Event::UserEvent(UserEvent::Tooltip { h, s, v }) => {
+                tooltip.hue = h;
+                tooltip.saturation = s;
+                tooltip.light_brightness = v;
                 if let Some(tray_icon) = tray_icon.as_mut() {
-                    set_tooltip(tray_icon, h, s, v);
+                    set_tooltip(tray_icon, tooltip);
                 }
             }
 
             #[cfg(target_os = "windows")]
-            Event::UserEvent(UserEvent::GlobalWheel { delta, ctrl, alt }) => {
+            Event::UserEvent(UserEvent::MonitorBrightness { brightness }) => {
+                tooltip.monitor_brightness = Some(brightness);
+                if let Some(tray_icon) = tray_icon.as_mut() {
+                    set_tooltip(tray_icon, tooltip);
+                }
+            }
+
+            #[cfg(target_os = "windows")]
+            Event::UserEvent(UserEvent::GlobalWheel {
+                delta,
+                ctrl,
+                alt,
+                shift,
+            }) => {
                 let step = (delta / 30) as f64;
-                if ctrl {
+                if shift {
+                    monitors.queue_brightness_step(step as i16);
+                } else if ctrl {
                     light.queue_hue_step(step * 3.0);
                 } else if alt {
                     light.queue_saturation_step(step);
