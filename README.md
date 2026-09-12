@@ -52,8 +52,9 @@ A screenshot:
 | Shortcut | Action |
 | --- | --- |
 | Scroll | Adjust value |
-| Ctrl+Scroll | Adjust hue |
+| Ctrl+Scroll | Adjust hue (0-255) |
 | Alt+Scroll | Adjust saturation |
+| Middle-click | Reset hue and saturation to 0 |
 
 ## Windows startup
 

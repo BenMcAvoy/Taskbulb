@@ -26,6 +26,7 @@ enum LightCommand {
     Brightness(i16),
     Hue(f64),
     Saturation(f64),
+    ResetColor,
 }
 
 impl LightController {
@@ -66,6 +67,10 @@ impl LightController {
         let _ = self.command_tx.send(LightCommand::Saturation(step));
     }
 
+    pub fn queue_color_reset(&self) {
+        let _ = self.command_tx.send(LightCommand::ResetColor);
+    }
+
     async fn command_worker(&self, mut rx: mpsc::UnboundedReceiver<LightCommand>) {
         while let Some(command) = rx.recv().await {
             // Coalesce a burst of wheel messages into one queued operation.
@@ -74,12 +79,14 @@ impl LightController {
             let mut brightness_step = 0i16;
             let mut hue_step = 0.0;
             let mut saturation_step = 0.0;
+            let mut reset_color = false;
             let mut add_command = |command| match command {
                 LightCommand::Brightness(step) => {
                     brightness_step = brightness_step.saturating_add(step)
                 }
                 LightCommand::Hue(step) => hue_step += step,
                 LightCommand::Saturation(step) => saturation_step += step,
+                LightCommand::ResetColor => reset_color = true,
             };
 
             add_command(command);
@@ -93,14 +100,26 @@ impl LightController {
 
             let result = if state.brightness < 30 && brightness_step < 0 {
                 self.turn_off().await
-            } else if brightness_step == 0 && hue_step == 0.0 && saturation_step == 0.0 {
+            } else if !reset_color
+                && brightness_step == 0
+                && hue_step == 0.0
+                && saturation_step == 0.0
+            {
                 Ok(())
             } else {
                 self.apply_changes(
                     brightness_step,
-                    (state.hue + hue_step).rem_euclid(360.0),
-                    (state.saturation + saturation_step).clamp(0.0, 100.0),
-                    hue_step != 0.0 || saturation_step != 0.0,
+                    if reset_color {
+                        0.0
+                    } else {
+                        (state.hue + hue_step).clamp(0.0, 255.0)
+                    },
+                    if reset_color {
+                        0.0
+                    } else {
+                        (state.saturation + saturation_step).clamp(0.0, 100.0)
+                    },
+                    reset_color || hue_step != 0.0 || saturation_step != 0.0,
                 )
                 .await
             };
@@ -128,7 +147,10 @@ impl LightController {
         Ok(LightState {
             is_on: value.get("state").and_then(Value::as_str) == Some("on"),
             brightness: value["attributes"]["brightness"].as_i64().unwrap_or(0),
-            hue: value["attributes"]["hs_color"][0].as_f64().unwrap_or(0.0),
+            hue: value["attributes"]["hs_color"][0]
+                .as_f64()
+                .unwrap_or(0.0)
+                .clamp(0.0, 255.0),
             saturation: value["attributes"]["hs_color"][1].as_f64().unwrap_or(0.0),
         })
     }

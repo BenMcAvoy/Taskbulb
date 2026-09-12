@@ -184,6 +184,12 @@ async fn main() {
                             });
                         }
                     });
+                } else if let TrayIconEvent::Click {
+                    button: MouseButton::Middle,
+                    ..
+                } = event
+                {
+                    light.queue_color_reset();
                 }
             }
 
@@ -311,7 +317,7 @@ fn light_icon(is_on: bool, hue: f64, saturation: f64) -> Icon {
 }
 
 fn hsv_to_rgb(hue: f64, saturation: f64) -> [u8; 4] {
-    let h = hue.rem_euclid(360.0) / 60.0;
+    let h = hue.clamp(0.0, 255.0) * 6.0 / 255.0;
     let s = saturation.clamp(0.0, 100.0) / 100.0;
     let c = s;
     let m = 1.0 - c;
