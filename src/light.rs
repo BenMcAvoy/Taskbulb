@@ -72,6 +72,10 @@ impl LightController {
     }
 
     async fn command_worker(&self, mut rx: mpsc::UnboundedReceiver<LightCommand>) {
+        // Home Assistant may report hue as zero while saturation is zero. Keep the last
+        // requested hue locally so hue adjustments are not lost in that state.
+        let mut remembered_hue = None;
+
         while let Some(command) = rx.recv().await {
             // Coalesce a burst of wheel messages into one queued operation.
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -98,6 +102,17 @@ impl LightController {
                 continue;
             };
 
+            let hue = if reset_color {
+                remembered_hue = Some(0.0);
+                0.0
+            } else if hue_step != 0.0 {
+                let next_hue = (remembered_hue.unwrap_or(state.hue) + hue_step).clamp(0.0, 255.0);
+                remembered_hue = Some(next_hue);
+                next_hue
+            } else {
+                remembered_hue.unwrap_or(state.hue)
+            };
+
             let result = if state.brightness < 30 && brightness_step < 0 {
                 self.turn_off().await
             } else if !reset_color
@@ -109,11 +124,7 @@ impl LightController {
             } else {
                 self.apply_changes(
                     brightness_step,
-                    if reset_color {
-                        0.0
-                    } else {
-                        (state.hue + hue_step).clamp(0.0, 255.0)
-                    },
+                    hue,
                     if reset_color {
                         0.0
                     } else {
@@ -128,7 +139,14 @@ impl LightController {
                 continue;
             }
 
-            if let Ok(state) = self.state().await {
+            if let Ok(mut state) = self.state().await {
+                // Hue has no observable meaning at zero saturation, so Home Assistant may
+                // normalize it back to zero. Keep showing the user's selected hue locally.
+                if state.saturation == 0.0
+                    && let Some(hue) = remembered_hue
+                {
+                    state.hue = hue;
+                }
                 let _ = self.updates.send(state);
             }
         }
