@@ -56,7 +56,7 @@ fn tooltip_text(state: TooltipState) -> String {
         .map(|brightness| format!("{brightness}%"))
         .unwrap_or_else(|| "--".to_string());
     format!(
-        "H: {:.0}, S: {:.0}%, Brightness: {:.0}%, Monitor: {}",
+        "H: {:.0}°, S: {:.0}%, Brightness: {:.0}%, Monitor: {}",
         state.hue,
         state.saturation,
         state.light_brightness as f64 * 100.0 / 255.0,
@@ -369,7 +369,7 @@ fn light_icon(is_on: bool, hue: f64, saturation: f64) -> Icon {
 }
 
 fn hsv_to_rgb(hue: f64, saturation: f64) -> [u8; 4] {
-    let h = hue.clamp(0.0, 255.0) * 6.0 / 255.0;
+    let h = hue.clamp(0.0, 360.0) / 60.0;
     let s = saturation.clamp(0.0, 100.0) / 100.0;
     let c = s;
     let m = 1.0 - c;

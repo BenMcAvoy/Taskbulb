@@ -106,7 +106,7 @@ impl LightController {
                 remembered_hue = Some(0.0);
                 0.0
             } else if hue_step != 0.0 {
-                let next_hue = (remembered_hue.unwrap_or(state.hue) + hue_step).clamp(0.0, 255.0);
+                let next_hue = (remembered_hue.unwrap_or(state.hue) + hue_step).clamp(0.0, 360.0);
                 remembered_hue = Some(next_hue);
                 next_hue
             } else {
@@ -168,7 +168,7 @@ impl LightController {
             hue: value["attributes"]["hs_color"][0]
                 .as_f64()
                 .unwrap_or(0.0)
-                .clamp(0.0, 255.0),
+                .clamp(0.0, 360.0),
             saturation: value["attributes"]["hs_color"][1].as_f64().unwrap_or(0.0),
         })
     }
